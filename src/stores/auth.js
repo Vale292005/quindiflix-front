@@ -5,7 +5,7 @@ import axios from 'axios'
 axios.defaults.withCredentials = true;
 
 export const useAuthStore = defineStore('auth', () => {
-    const usuario = ref(null)
+    const usuario = ref(null);
 
     const userInit = localStorage.getItem('usuario')
     if (userInit && userInit !== "undefined" && userInit !== "null") {
@@ -41,13 +41,9 @@ export const useAuthStore = defineStore('auth', () => {
 
             const respuesta = await axios.post('http://localhost:8080/api/auth/login', payload);
 
-            console.log("2. Respuesta recibida:", respuesta.data);
+            const datosCompletos = respuesta.data;
 
-            const datosParaEstado = {
-                correoElectronico: email,
-            };
-
-            guardarSesion(datosParaEstado);
+            guardarSesion(datosCompletos);
 
             return respuesta.data;
         } catch (error) {

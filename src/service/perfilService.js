@@ -10,12 +10,13 @@ export const perfilService = {
     }
   },
 
-  async crearPerfil(datosPerfil) {
+async crearPerfil(payload) {
     try {
-      const response = await api.post('/perfiles', datosPerfil);
+      const response = await api.post('/perfiles', payload);
       return response.data;
     } catch (error) {
-      throw error.response?.data?.message || 'No se pudo crear el perfil';
+      console.error("Error en la petición POST /perfiles:", error.response?.data);
+      throw error;
     }
   }
 };

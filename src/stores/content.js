@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import { peliculaService } from '../services/peliculaService';
-import { categoriaService } from '../services/categoriaService';
+import { ref, computed } from 'vue';
+import { peliculaService } from '../service/peliculaService';
+import { categoriaService } from '../service/categoriaService';
 
 export const useContentStore = defineStore('content', () => {
     const peliculas = ref([]);
@@ -16,16 +16,24 @@ export const useContentStore = defineStore('content', () => {
         return peliculas.value.filter(p => p.categoriaId === categoriaSeleccionada.value);
     });
 
-    async function cargarTodoElContenido() {
+async function cargarTodoElContenido() {
         cargando.value = true;
         try {
-            // Hacemos ambas peticiones al tiempo para ganar velocidad
             const [dataPelis, dataCats] = await Promise.all([
                 peliculaService.obtenerTodas(),
                 categoriaService.obtenerTodas()
             ]);
+
+            // DEBUG: Mira esto en la consola del navegador
+            console.log("Datos Pelis recibidos:", dataPelis); 
+            console.log("Datos Categorias recibidos:", dataCats);
+
+            if (!dataPelis) throw new Error("Servicio de películas devolvió undefined");
+
             peliculas.value = dataPelis;
             categorias.value = dataCats;
+        } catch (e) {
+            console.error("Error dentro del store:", e);
         } finally {
             cargando.value = false;
         }
@@ -34,4 +42,14 @@ export const useContentStore = defineStore('content', () => {
     function filtrarPorCategoria(id) {
         categoriaSeleccionada.value = id;
     }
+
+    return {
+        peliculas,
+        categorias,
+        cargando,
+        categoriaSeleccionada,
+        peliculasFiltradas,
+        cargarTodoElContenido,
+        filtrarPorCategoria
+    };
 });
