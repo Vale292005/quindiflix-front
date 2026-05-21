@@ -6,6 +6,7 @@ import api from '../api/axios'
 
 const router = useRouter();
 const contentStore = useContentStore();
+const generos = ref([]);
 
 // Variables de estado
 const contenidos = ref([]);
@@ -34,14 +35,17 @@ const podcasts = computed(() => {
   return contenidos.value.filter(c => c?.tipoContenido === 'Podcast' || c?.tipo_contenido === 'Podcast');
 });
 
-// Función de carga de datos corregida
+// Permisos de empleado
+const esEmpleado = computed(() => {
+  return perfilActivo.value?.tipoPerfil === 'Empleado' || perfilActivo.value?.tipo_perfil === 'Empleado';
+});
+
+// Función de carga de datos
 const cargarContenidos = async () => {
   try {
     loading.value = true;
 
-    // 1. Cargamos el catálogo general desde Pinia
     await contentStore.cargarTodoElContenido();
-
     const todosLosDatos = contentStore.peliculas || contentStore.contenidos || [];
 
     const tipoPerfil = perfilActivo.value?.tipoPerfil || perfilActivo.value?.tipo_perfil;
@@ -51,24 +55,15 @@ const cargarContenidos = async () => {
       contenidos.value = todosLosDatos.filter(c => c?.esInfantil === true || c?.esInfantil === 1 || c?.es_infantil === 1);
     }
 
-    // 2. Cargamos los favoritos de forma directa y limpia
     const idPerfilActual = perfilActivo.value?.idPerfil || perfilActivo.value?.id_perfil;
-    console.log("Enviando petición a favoritos con ID de Perfil:", idPerfilActual);
-
     if (idPerfilActual) {
-      // Limpiamos antes de la petición para asegurar reactividad limpia
       favoritos.value = [];
-
       const response = await api.get(`http://localhost:8080/api/favoritos/perfil/${idPerfilActual}`);
-
-      // LOG DE ORO: Para revisar el nombre exacto de las llaves en la consola de Chrome
-      console.log("Datos que entraron directos al Front:", response.data);
-
-      // Asignación directa sin filtros intermedios que puedan borrar los datos
       favoritos.value = response.data || [];
-
-      console.log("Favoritos cargados con éxito total en el Front. Total:", favoritos.value.length);
     }
+    
+    const responseGeneros = await api.get('http://localhost:8080/api/generos'); 
+    generos.value = responseGeneros.data || [];
 
   } catch (error) {
     console.error("Error cargando datos en el Dashboard:", error);
@@ -78,8 +73,31 @@ const cargarContenidos = async () => {
   }
 };
 
+// Navegación
 const irADetalle = (idContenido) => {
   router.push(`/contenido/${idContenido}`);
+};
+
+const irPanelEmpleado = () => {
+  router.push('/panel-empleado');
+};
+
+const cambiarAvatar = () => {
+  router.push({ path: '/cambiar-avatar' });
+};
+
+const salirPerfil = () => {
+  localStorage.removeItem('perfil_activo');
+  router.push('/profiles');
+};
+
+const contenidosPorGenero = (idGenero) => {
+  if (!Array.isArray(contenidos.value)) return [];
+  return contenidos.value.filter(c => {
+    const categoriaId = c?.idCategoria || c?.id_categoria || c?.idCategoriaContenido;
+    if (categoriaId === undefined || categoriaId === null) return false;
+    return Number(categoriaId) === Number(idGenero);
+  });
 };
 
 onMounted(cargarContenidos);
@@ -194,6 +212,58 @@ onMounted(cargarContenidos);
               :style="{ backgroundImage: `url(${item.urlImagen || 'https://via.placeholder.com/220x125'})` }">
               <p class="title-overlay text-info">{{ item.titulo }}</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-5" v-if="generos && generos.length">
+        <h3 class="mb-3 fs-4 text-white">Explorar por Géneros</h3>
+        
+        <div class="accordion accordion-dark" id="accordionGeneros">
+          <div class="accordion-item bg-dark text-white border-secondary" 
+               v-for="(genero, index) in generos" :key="genero.idGenero">
+            
+            <h2 class="accordion-header" :id="'heading-' + genero.idGenero">
+              <button class="accordion-button collapsed bg-dark text-white fw-bold" 
+                      type="button" 
+                      data-bs-toggle="collapse" 
+                      :data-bs-target="'#collapse-' + genero.idGenero" 
+                      aria-expanded="false" 
+                      :aria-controls="'collapse-' + genero.idGenero">
+                {{ genero.nombre }}
+              </button>
+            </h2>
+            
+            <div :id="'collapse-' + genero.idGenero" 
+                 class="accordion-collapse collapse" 
+                 :aria-labelledby="'heading-' + genero.idGenero" 
+                 data-bs-parent="#accordionGeneros">
+              
+              <div class="accordion-body bg-dark px-2">
+                
+                <div v-if="contenidosPorGenero(genero.idGenero).length" class="row-scroll">
+                  <div v-for="item in contenidosPorGenero(genero.idGenero)" 
+                       :key="item.idContenido" 
+                       class="content-card"
+                       @click="irADetalle(item.idContenido)" 
+                       style="cursor: pointer;">
+                    
+                    <div class="card-image rounded"
+                      :style="{ backgroundImage: `url(${item.urlImagen || 'https://via.placeholder.com/220x125'})` }">
+                      <span class="original-tag" v-if="item.esOriginal">Original</span>
+                      <p class="title-overlay">{{ item.titulo }}</p>
+                    </div>
+                    
+                  </div>
+                </div>
+                
+                <div v-else class="text-muted small py-2 ps-3">
+                  <i class="bi bi-info-circle me-2"></i>No hay contenidos disponibles en este género.
+                </div>
+
+              </div>
+            </div>
+
           </div>
         </div>
       </section>

@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/auth'
 import LoginView from '../views/LoginView.vue';
 import RegistroView from '../views/RegistroView.vue';
 import DashboardView from '../views/DashboardView.vue';
+import CambiarAvatarView from '../views/CambiarAvatarView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -32,7 +33,19 @@ const router = createRouter({
       path: '/contenido/:id',
       name: 'ContenidoDetalle',
       component: () => import('../views/ContenidoDetalleView.vue'),
-      meta: { requiresAuth: true } // Apunta a la vista que crearemos
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/cambiar-avatar',
+      name: 'cambiar-avatar',
+      component: CambiarAvatarView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/panel-empleado',
+      name: 'panel-empleado',
+      component: PanelEmpleadoView,
+      meta: { requiresAuth: true, requiresRole: 'empleado' }
     }
   ]
 });
