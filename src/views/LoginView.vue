@@ -55,10 +55,15 @@ const handleLogin = async () => {
   error.value = null;
 
   try {
+    const esEmpleado = email.value.toLowerCase().includes('@quindiflix.com');
     // Llamamos al store
-    await authStore.iniciarSesion(email.value, password.value);
-
-    console.log("-> Login exitoso en store, redirigiendo...");
+    if (esEmpleado) {
+      // Llama al flujo plano de empleado
+      await authStore.iniciarSesionEmpleado(email.value, password.value);
+    } else {
+      // Llama a tu flujo tradicional de clientes
+      await authStore.iniciarSesion(email.value, password.value);
+    }
 
     await router.push('/profiles');
 

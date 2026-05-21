@@ -25,6 +25,48 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem('usuario', JSON.stringify(datosUsuario));
     }
 
+async function iniciarSesionEmpleado(email, password) {
+        try {
+            // 1. Limpieza preventiva total de cualquier sesión previa usando refs directas
+            localStorage.clear();
+            usuario.value = null;   // 🌟 CORREGIDO: Se quitó 'this'
+            perfiles.value = [];    // 🌟 CORREGIDO: Se quitó 'this'
+
+            // El backend para empleados recibe un JSON plano de clave-valor
+            const payload = {
+                correo: email,
+                password: password
+            };
+
+            console.log("🚀 Enviando payload de Empleado...", payload);
+
+            // Apuntamos al nuevo endpoint aislado que creamos en Spring Boot
+            const respuesta = await axios.post('http://localhost:8080/api/auth/login-empleado', payload);
+            const empleado = respuesta.data;
+
+            console.log("👋 Empleado autenticado con éxito:", empleado.nombre);
+
+            // 2. Creamos un perfil virtual/ficticio de Empleado para que el Dashboard lo reconozca
+            const perfilEmpleado = {
+                nombre: empleado.nombre,
+                tipoPerfil: 'Empleado', // 🎯 Activa automáticamente el v-if del Panel de Control en el Dashboard
+                avatar: 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png'
+            };
+
+            // 3. Guardamos en el localStorage para mantener la persistencia
+            localStorage.setItem('perfil_activo', JSON.stringify(perfilEmpleado));
+
+            // 🌟 CORREGIDO: Guardamos usando .value para mantener la reactividad de Vue 3
+            usuario.value = empleado;
+            localStorage.setItem('usuario', JSON.stringify(empleado));
+
+            return empleado;
+        } catch (error) {
+            console.error("❌ Error en el proceso de login de Empleado:", error);
+            throw error;
+        }
+    }
+
     async function iniciarSesion(email, password) {
         try {
             localStorage.clear();
@@ -91,8 +133,8 @@ export const useAuthStore = defineStore('auth', () => {
         } catch (error) {
             if (error.response && error.response.status === 404) {
                 console.log(`El usuario ${usuario.value.idUsuario} no tiene perfiles creados aún. Inicializando vacío.`);
-                perfiles.value = []; 
-                return [];           
+                perfiles.value = [];
+                return [];
             }
             console.error("Error cargando perfiles:", error);
             throw error;
@@ -115,6 +157,7 @@ export const useAuthStore = defineStore('auth', () => {
         perfiles,
         estaAutenticado,
         iniciarSesion,
+        iniciarSesionEmpleado,
         cerrarSesion,
         cargarPerfiles,
         crearPerfil
