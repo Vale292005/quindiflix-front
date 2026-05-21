@@ -1,53 +1,85 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import axios from 'axios';
+import { useRouter } from 'vue-router';
 import { useContentStore } from '../stores/content';
+import api from '../api/axios'
 
+const router = useRouter();
 const contentStore = useContentStore();
-const contenidos = ref([]);
-const loading = ref(true);
-const perfilActivo = ref(JSON.parse(localStorage.getItem('perfil_activo')));
 
+// Variables de estado
+const contenidos = ref([]);
+const favoritos = ref([]);
+const loading = ref(true);
+const perfilActivo = ref(JSON.parse(localStorage.getItem('perfil_activo')) || {});
+
+// Filtros computados ultra-seguros
 const peliculas = computed(() => {
-  return Array.isArray(contenidos.value)
-    ? contenidos.value.filter(c => {
-      const texto = (c.tipoContenido || "").toLowerCase().trim();
-      const tipoLimpio = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      return tipoLimpio.includes('pelicula');
-    })
-    : [];
+  if (!Array.isArray(contenidos.value)) return [];
+  return contenidos.value.filter(c => {
+    const tipo = c?.tipoContenido || c?.tipo_contenido || "";
+    const texto = tipo.toLowerCase().trim();
+    const tipoLimpio = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return tipoLimpio.includes('pelicula');
+  });
 });
 
 const series = computed(() => {
-  return Array.isArray(contenidos.value)
-    ? contenidos.value.filter(c => c.tipoContenido === 'Serie')
-    : [];
+  if (!Array.isArray(contenidos.value)) return [];
+  return contenidos.value.filter(c => c?.tipoContenido === 'Serie' || c?.tipo_contenido === 'Serie');
 });
 
 const podcasts = computed(() => {
-  return Array.isArray(contenidos.value)
-    ? contenidos.value.filter(c => c.tipoContenido === 'Podcast')
-    : [];
+  if (!Array.isArray(contenidos.value)) return [];
+  return contenidos.value.filter(c => c?.tipoContenido === 'Podcast' || c?.tipo_contenido === 'Podcast');
 });
+
+// Función de carga de datos corregida
 const cargarContenidos = async () => {
   try {
     loading.value = true;
+
+    // 1. Cargamos el catálogo general desde Pinia
     await contentStore.cargarTodoElContenido();
-    const todosLosDatos = contentStore.peliculas; 
-    if (perfilActivo.value.tipoPerfil === 'Adulto') {
+
+    const todosLosDatos = contentStore.peliculas || contentStore.contenidos || [];
+
+    const tipoPerfil = perfilActivo.value?.tipoPerfil || perfilActivo.value?.tipo_perfil;
+    if (tipoPerfil === 'Adulto') {
       contenidos.value = todosLosDatos;
     } else {
-      contenidos.value = todosLosDatos.filter(c => c.esInfantil === true || c.esInfantil === 1);
+      contenidos.value = todosLosDatos.filter(c => c?.esInfantil === true || c?.esInfantil === 1 || c?.es_infantil === 1);
     }
 
-    console.log("Perfil actual:", perfilActivo.value.tipoPerfil);
-    console.log("Contenidos finales a mostrar:", contenidos.value.length);
+    // 2. Cargamos los favoritos de forma directa y limpia
+    const idPerfilActual = perfilActivo.value?.idPerfil || perfilActivo.value?.id_perfil;
+    console.log("Enviando petición a favoritos con ID de Perfil:", idPerfilActual);
+
+    if (idPerfilActual) {
+      // Limpiamos antes de la petición para asegurar reactividad limpia
+      favoritos.value = [];
+
+      const response = await api.get(`http://localhost:8080/api/favoritos/perfil/${idPerfilActual}`);
+
+      // LOG DE ORO: Para revisar el nombre exacto de las llaves en la consola de Chrome
+      console.log("Datos que entraron directos al Front:", response.data);
+
+      // Asignación directa sin filtros intermedios que puedan borrar los datos
+      favoritos.value = response.data || [];
+
+      console.log("Favoritos cargados con éxito total en el Front. Total:", favoritos.value.length);
+    }
 
   } catch (error) {
-    console.error("Error cargando contenidos:", error);
+    console.error("Error cargando datos en el Dashboard:", error);
+    favoritos.value = [];
   } finally {
     loading.value = false;
   }
+};
+
+const irADetalle = (idContenido) => {
+  router.push(`/contenido/${idContenido}`);
 };
 
 onMounted(cargarContenidos);
@@ -56,10 +88,37 @@ onMounted(cargarContenidos);
   <div class="dashboard bg-dark min-vh-100 text-white pb-5">
 
     <header class="p-4 d-flex justify-content-between align-items-center">
-      <h1 class="text-danger fw-bold m-0">QUINDIFLIX</h1>
+      <h1 class="text-danger fw-bold m-0" style="cursor: pointer;" @click="$router.push('/dashboard')">QUINDIFLIX</h1>
+
       <div class="d-flex align-items-center gap-3">
-        <span>Viendo ahora: <strong>{{ perfilActivo?.nombre }}</strong></span>
-        <div class="badge bg-primary">{{ perfilActivo?.tipoPerfil }}</div>
+        <div class="dropdown">
+          <button class="btn btn-outline-light dropdown-toggle d-flex align-items-center gap-2" type="button"
+            id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+            <img :src="perfilActivo?.avatar" alt="Avatar" width="30" class="rounded">
+            <span>{{ perfilActivo?.nombre }}</span>
+          </button>
+
+          <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="userMenu">
+            <li>
+              <h6 class="dropdown-header">Perfil: {{ perfilActivo?.tipoPerfil }}</h6>
+            </li>
+            <li><a class="dropdown-item" href="#" @click.prevent="cambiarAvatar">Cambiar Avatar</a></li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+
+            <li v-if="esEmpleado">
+              <a class="dropdown-item text-warning" href="#" @click.prevent="irPanelEmpleado">
+                <i class="bi bi-gear-fill me-2"></i>Panel de Control Empleado
+              </a>
+            </li>
+            <li v-if="esEmpleado">
+              <hr class="dropdown-divider">
+            </li>
+
+            <li><a class="dropdown-item text-danger" href="#" @click.prevent="salirPerfil">Salir del Perfil</a></li>
+          </ul>
+        </div>
       </div>
     </header>
 
@@ -69,14 +128,44 @@ onMounted(cargarContenidos);
 
     <main v-else class="px-4">
 
+      <section class="mt-4" v-if="favoritos && favoritos.length">
+        <h3 class="mb-3 fs-4 text-warning"><i class="bi bi-star-fill me-2"></i>Mi Lista Favorita</h3>
+        <div class="row-scroll">
+
+          <div v-for="item in favoritos" :key="item.idContenido || item.id_contenido" class="content-card"
+            @click="irADetalle(item.idContenido || item.id_contenido)" style="cursor: pointer;">
+
+            <div class="card-image rounded"
+              :style="{ backgroundImage: `url(${item.urlImagen || item.url_imagen || 'https://via.placeholder.com/220x125'})` }">
+              <span class="original-tag" v-if="item.esOriginal || item.es_original">Original</span>
+              <p class="title-overlay">{{ item.titulo }}</p>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
       <section class="mt-4" v-if="peliculas.length">
         <h3 class="mb-3 fs-4">Películas que te encantarán</h3>
         <div class="row-scroll">
-          <div v-for="item in peliculas" :key="item.idContenido" class="content-card">
-            <div class="card-image rounded"
-              :style="{ backgroundImage: `url(${item?.urlImagen || 'https://via.placeholder.com/220x125'})` }">
-              <span class="original-tag" v-if="item?.esOriginal">Original</span>
-              <p class="title-overlay">{{ item?.titulo }}</p>
+          <div v-for="item in peliculas" :key="item.idContenido" class="content-card"
+            @click="irADetalle(item.idContenido)" style="cursor: pointer;">
+            <div
+              class="card-image rounded position-relative overflow-hidden bg-dark d-flex align-items-center justify-content-center"
+              style="height: 125px; width: 220px;">
+
+              <img v-if="item?.urlImagen" :src="item.urlImagen" referrerpolicy="no-referrer"
+                class="w-100 h-100 object-fit-cover position-absolute top-0 start-0"
+                @error="(e) => e.target.style.display = 'none'" />
+
+              <div v-else class="text-center text-muted small position-absolute">
+                <i class="bi bi-play-circle fs-3 d-block mb-1"></i>
+                <span>{{ item?.titulo }}</span>
+              </div>
+
+              <span class="original-tag" v-if="item?.esOriginal" style="z-index: 2;">Original</span>
+              <p class="title-overlay" style="z-index: 2;">{{ item?.titulo }}</p>
             </div>
           </div>
         </div>
@@ -85,7 +174,8 @@ onMounted(cargarContenidos);
       <section class="mt-5" v-if="series.length">
         <h3 class="mb-3 fs-4">Series más vistas</h3>
         <div class="row-scroll">
-          <div v-for="item in series" :key="item.idContenido" class="content-card">
+          <div v-for="item in series" :key="item.idContenido" class="content-card" @click="irADetalle(item.idContenido)"
+            style="cursor: pointer;">
             <div class="card-image rounded"
               :style="{ backgroundImage: `url(${item.urlImagen || 'https://via.placeholder.com/220x125'})` }">
               <span class="original-tag" v-if="item.esOriginal">Original</span>
@@ -98,7 +188,8 @@ onMounted(cargarContenidos);
       <section class="mt-5" v-if="podcasts.length">
         <h3 class="mb-3 fs-4">Podcasts destacados</h3>
         <div class="row-scroll">
-          <div v-for="item in podcasts" :key="item.idContenido" class="content-card">
+          <div v-for="item in podcasts" :key="item.idContenido" class="content-card"
+            @click="irADetalle(item.idContenido)" style="cursor: pointer;">
             <div class="card-image rounded"
               :style="{ backgroundImage: `url(${item.urlImagen || 'https://via.placeholder.com/220x125'})` }">
               <p class="title-overlay text-info">{{ item.titulo }}</p>

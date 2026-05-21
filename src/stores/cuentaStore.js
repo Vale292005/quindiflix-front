@@ -23,6 +23,8 @@ export const useCuentaStore = defineStore('cuenta', () => {
         const authStore = useAuthStore();
         const usuarioId = authStore.usuario?.idUsuario;
 
+        cuenta.value = null;
+
         if (!usuarioId) {
             console.warn("No hay un usuario en sesión para cargar la cuenta");
             return;

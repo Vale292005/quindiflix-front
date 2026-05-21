@@ -27,6 +27,12 @@ const router = createRouter({
       name: 'dashboard',
       component: DashboardView,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/contenido/:id',
+      name: 'ContenidoDetalle',
+      component: () => import('../views/ContenidoDetalleView.vue'),
+      meta: { requiresAuth: true } // Apunta a la vista que crearemos
     }
   ]
 });

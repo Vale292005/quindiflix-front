@@ -49,6 +49,7 @@ const guardarNuevoPerfil = async () => {
     tipoSeleccionado.value = 'Adulto';
     mostrarFormulario.value = false;
     alert("¡Perfil creado con éxito!");
+    await authStore.cargarPerfiles();
 
   } catch (error) {
     console.error("Fallo total:", error);
@@ -64,11 +65,11 @@ onMounted(async () => { // <--- Agrega 'async' aquí
   try {
     console.log("Iniciando carga de perfiles y cuenta...");
 
-    await authStore.cargarPerfiles();
-    console.log("Perfiles cargados con éxito");
-
     await cuentaStore.cargarCuentaUsuario();
     console.log("Cuenta cargada:", cuentaStore.idCuentaActiva);
+
+    await authStore.cargarPerfiles();
+    console.log("Perfiles cargados con éxito");
 
   } catch (error) {
     console.error("Error en la carga inicial:", error);
