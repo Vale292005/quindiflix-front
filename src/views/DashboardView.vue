@@ -49,7 +49,7 @@ const cargarContenidos = async () => {
     const todosLosDatos = contentStore.peliculas || contentStore.contenidos || [];
 
     const tipoPerfil = perfilActivo.value?.tipoPerfil || perfilActivo.value?.tipo_perfil;
-    if (tipoPerfil === 'Adulto') {
+    if (tipoPerfil === 'Adulto' || tipoPerfil === 'Empleado') {
       contenidos.value = todosLosDatos;
     } else {
       contenidos.value = todosLosDatos.filter(c => c?.esInfantil === true || c?.esInfantil === 1 || c?.es_infantil === 1);

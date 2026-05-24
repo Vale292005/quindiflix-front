@@ -24,10 +24,6 @@ async function cargarTodoElContenido() {
                 categoriaService.obtenerTodas()
             ]);
 
-            // DEBUG: Mira esto en la consola del navegador
-            console.log("Datos Pelis recibidos:", dataPelis); 
-            console.log("Datos Categorias recibidos:", dataCats);
-
             if (!dataPelis) throw new Error("Servicio de películas devolvió undefined");
 
             peliculas.value = dataPelis;

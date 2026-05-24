@@ -50,36 +50,43 @@ const authStore = useAuthStore();
 const router = useRouter();
 
 const handleLogin = async () => {
-  console.log("-> Iniciando handleLogin");
+  console.log("-> Iniciando proceso de Login Unificado");
   cargando.value = true;
   error.value = null;
 
   try {
-    const esEmpleado = email.value.toLowerCase().includes('@quindiflix.com');
-    // Llamamos al store
+    // Limpiamos espacios extras y aseguramos minúsculas para evitar fallos de tipeo
+    const correoProcesado = email.value.trim().toLowerCase();
+    const esEmpleado = correoProcesado.includes('@quindioflix.com');
+    
     if (esEmpleado) {
-      // Llama al flujo plano de empleado
-      await authStore.iniciarSesionEmpleado(email.value, password.value);
+      console.log("-> Flujo Empleado Corporativo detectado");
+      // Esperamos que el store termine la petición y guarde el estado/token
+      await authStore.iniciarSesionEmpleado(correoProcesado, password.value);
+      
+      console.log("-> Autenticación de empleado exitosa. Redirigiendo a /dashboard");
+      await router.push('/dashboard');
     } else {
-      // Llama a tu flujo tradicional de clientes
-      await authStore.iniciarSesion(email.value, password.value);
+      console.log("-> Flujo Cliente Estándar detectado");
+      // Esperamos el inicio de sesión tradicional
+      await authStore.iniciarSesion(correoProcesado, password.value);
+      
+      console.log("-> Autenticación de cliente exitosa. Redirigiendo a /profiles");
+      await router.push('/profiles');
     }
-
-    await router.push('/profiles');
 
   } catch (err) {
     console.error("-> Error capturado en vista:", err);
-    // Si el error tiene respuesta del servidor, mostrarla, si no, error genérico
+    // Captura el mensaje exacto que mande el backend si las credenciales fallan
     error.value = err.response?.data?.mensaje || "Credenciales incorrectas o error de servidor";
   } finally {
     cargando.value = false;
-    console.log("-> Proceso finalizado");
+    console.log("-> Proceso handleLogin finalizado");
   }
 };
 </script>
 
 <style scoped>
-/* Estilo para que se parezca más a los inputs de Netflix */
 .form-control:focus {
   background-color: #454545 !important;
   box-shadow: none;

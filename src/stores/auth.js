@@ -3,12 +3,14 @@ import { ref, computed } from 'vue'
 import axios from 'axios'
 import { useCuentaStore } from './cuentaStore';
 
+// Configuración global crítica para el envío automático de cookies de sesión
 axios.defaults.withCredentials = true;
 
 export const useAuthStore = defineStore('auth', () => {
     const usuario = ref(null);
-    localStorage.clear();
+    const perfiles = ref([]);
 
+    // Cargar sesión inicial al refrescar pantalla de manera segura
     const userInit = localStorage.getItem('usuario')
     if (userInit && userInit !== "undefined" && userInit !== "null") {
         try {
@@ -20,45 +22,58 @@ export const useAuthStore = defineStore('auth', () => {
 
     const estaAutenticado = computed(() => !!usuario.value)
 
+    // Método centralizado para guardar la sesión en el estado y LocalStorage
     function guardarSesion(datosUsuario) {
         usuario.value = datosUsuario;
         localStorage.setItem('usuario', JSON.stringify(datosUsuario));
     }
 
-async function iniciarSesionEmpleado(email, password) {
+    async function iniciarSesionEmpleado(email, password) {
         try {
-            // 1. Limpieza preventiva total de cualquier sesión previa usando refs directas
+            // 1. Limpieza preventiva total de cualquier sesión previa
             localStorage.clear();
-            usuario.value = null;   // 🌟 CORREGIDO: Se quitó 'this'
-            perfiles.value = [];    // 🌟 CORREGIDO: Se quitó 'this'
+            usuario.value = null;
+            perfiles.value = [];
 
-            // El backend para empleados recibe un JSON plano de clave-valor
             const payload = {
                 correo: email,
                 password: password
             };
 
-            console.log("🚀 Enviando payload de Empleado...", payload);
+            console.log("🚀 Enviando payload de Empleado (JWT Mode)...", payload);
 
-            // Apuntamos al nuevo endpoint aislado que creamos en Spring Boot
+            // Apuntamos al endpoint aislado de Spring Boot
             const respuesta = await axios.post('http://localhost:8080/api/auth/login-empleado', payload);
             const empleado = respuesta.data;
 
             console.log("👋 Empleado autenticado con éxito:", empleado.nombre);
 
-            // 2. Creamos un perfil virtual/ficticio de Empleado para que el Dashboard lo reconozca
+            // ==========================================================
+            // 🔥 EL CAMBIO CRÍTICO: CAPTURAR E INYECTAR EL TOKEN JWT 🔥
+            // Revisa si tu backend lo devuelve como empleado.token o respuesta.data.token
+            const token = empleado.token || respuesta.data.token;
+
+            if (token) {
+                localStorage.setItem('token', token);
+                // Inyectamos el Bearer Token inmediatamente en Axios para las siguientes peticiones
+                axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                console.log("🔑 Token JWT corporativo inyectado con éxito.");
+            } else {
+                console.error("❌ ERROR: El backend autenticó pero no devolvió un campo 'token'.");
+            }
+            // ==========================================================
+
+            // 2. Creamos el perfil virtual/ficticio para saltar la selección de perfiles en el front
             const perfilEmpleado = {
-                nombre: empleado.nombre,
-                tipoPerfil: 'Empleado', // 🎯 Activa automáticamente el v-if del Panel de Control en el Dashboard
+                nombre: empleado.nombre || empleado.nombreCompleto || 'Admin',
+                tipoPerfil: 'Empleado',
                 avatar: 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png'
             };
 
-            // 3. Guardamos en el localStorage para mantener la persistencia
             localStorage.setItem('perfil_activo', JSON.stringify(perfilEmpleado));
 
-            // 🌟 CORREGIDO: Guardamos usando .value para mantener la reactividad de Vue 3
-            usuario.value = empleado;
-            localStorage.setItem('usuario', JSON.stringify(empleado));
+            // 3. Guardamos los datos en el estado reactivo global
+            guardarSesion(empleado);
 
             return empleado;
         } catch (error) {
@@ -66,14 +81,11 @@ async function iniciarSesionEmpleado(email, password) {
             throw error;
         }
     }
-
     async function iniciarSesion(email, password) {
         try {
             localStorage.clear();
-            localStorage.removeItem('usuario');
-            localStorage.removeItem('perfil_activo');
-            this.usuario = null; // Limpia el estado de Pinia también
-            this.perfiles = [];
+            usuario.value = null;
+            perfiles.value = [];
 
             const payload = {
                 datosUsuario: {
@@ -88,17 +100,14 @@ async function iniciarSesionEmpleado(email, password) {
                 password: password
             };
 
-            console.log("1. Enviando payload (Cookies Mode)...", payload);
+            console.log("1. Enviando payload Cliente (Cookies Mode)...", payload);
 
             const respuesta = await axios.post('http://localhost:8080/api/auth/login', payload);
-
-            console.log("ID recibido del servidor:", respuesta.data.idUsuario);
-
             const datosCompletos = respuesta.data;
 
             guardarSesion(datosCompletos);
 
-            return respuesta.data;
+            return datosCompletos;
         } catch (error) {
             console.error("Error en el proceso de login del Store:", error);
             throw error;
@@ -112,17 +121,13 @@ async function iniciarSesionEmpleado(email, password) {
         } catch (error) {
             console.warn("El servidor no pudo invalidar la cookie, limpiando local...");
         } finally {
-            // Siempre limpiamos el local aunque el server falle
             usuario.value = null;
             perfiles.value = [];
             cuentaStore.limpiarCuenta();
-            localStorage.removeItem('usuario');
-            localStorage.removeItem('perfil_activo');
-            localStorage.removeItem('cuenta_activa');
+            localStorage.clear();
+            delete axios.defaults.headers.common['Authorization'];
         }
     }
-
-    const perfiles = ref([])
 
     async function cargarPerfiles() {
         const cuentaStore = useCuentaStore();
@@ -132,7 +137,7 @@ async function iniciarSesionEmpleado(email, password) {
             return respuesta.data;
         } catch (error) {
             if (error.response && error.response.status === 404) {
-                console.log(`El usuario ${usuario.value.idUsuario} no tiene perfiles creados aún. Inicializando vacío.`);
+                console.log(`El usuario no tiene perfiles creados aún. Inicializando vacío.`);
                 perfiles.value = [];
                 return [];
             }

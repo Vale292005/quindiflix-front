@@ -8,17 +8,93 @@ const router = useRouter();
 const contenido = ref(null);
 const loading = ref(true);
 
+// --- ESTADO DE FAVORITOS ---
+const isFavorito = ref(false);
+const idFavoritoActual = ref(null); // Guardamos el ID del favorito para poder borrarlo fácilmente
+
+// TODO: Ajusta esto según cómo guardes tu perfil activo (ej: localStorage o authStore)
+const idPerfil = localStorage.getItem('perfilId') || 53; 
+
 onMounted(async () => {
   try {
-    // Llamamos al backend usando el ID que viaja en la URL
-    const response = await axios.get(`http://localhost:8080/api/contenidos/${route.params.id}`);
-    contenido.value = response.data;
+    // 1. Llamamos al backend para el detalle del contenido
+    const responseContenido = await axios.get(`http://localhost:8080/api/contenidos/${route.params.id}`);
+    contenido.value = responseContenido.data;
+
+    // 2. Verificamos inmediatamente si ya está en favoritos
+    await verificarSiEsFavorito();
+
   } catch (error) {
-    console.error("Error obteniendo el detalle:", error);
+    console.error("Error obteniendo el detalle o favoritos:", error);
   } finally {
     loading.value = false;
   }
 });
+
+// Función para comprobar si este contenido ya es favorito del perfil
+const verificarSiEsFavorito = async () => {
+  try {
+    const response = await axios.get(`http://localhost:8080/api/favoritos/perfil/${idPerfil}`);
+    const listaFavoritos = response.data;
+
+    // Buscamos directamente en la raíz del DTO que nos acabas de mostrar
+    const favoritoEncontrado = listaFavoritos.find(fav => 
+      fav.idContenido === parseInt(route.params.id)
+    );
+
+    if (favoritoEncontrado) {
+      isFavorito.value = true;
+      // Truco: Como el DTO no trae el id_favorito, guardamos el idContenido temporalmente
+      idFavoritoActual.value = favoritoEncontrado.idContenido; 
+    } else {
+      isFavorito.value = false;
+      idFavoritoActual.value = null;
+    }
+  } catch (error) {
+    console.error("Error verificando estado de favorito:", error);
+  }
+};
+
+// Función dinámica que agrega o quita dependiendo del estado actual (Toggle)
+const toggleFavorito = async () => {
+  try {
+    if (isFavorito.value) {
+      // SI YA ES FAVORITO -> LO ELIMINAMOS
+      await axios.delete(`http://localhost:8080/api/favoritos/${idFavoritoActual.value}`);
+      
+      isFavorito.value = false;
+      idFavoritoActual.value = null;
+      console.log("Eliminado de favoritos con éxito");
+} else {
+      // NO ES FAVORITO -> LO AGREGAMOS
+      
+      // PAYLOAD COMPLETAMENTE PLANO:
+      // Colocamos el idPerfil en la raíz exacta del JSON junto a los datos del contenido.
+      // Esto saciará el apetito del DTO de entrada de Spring Boot.
+      const payload = {
+        idPerfil: parseInt(idPerfil), // <--- En la raíz para mapear directo a un Integer/Long en Java
+        idContenido: contenido.value.idContenido || contenido.value.id_contenido || parseInt(route.params.id),
+        titulo: contenido.value.titulo,
+        tipoContenido: contenido.value.tipoContenido || contenido.value.tipo_contenido,
+        esOriginal: contenido.value.esOriginal || contenido.value.es_original || false,
+        urlImagen: contenido.value.urlImagen || contenido.value.url_imagen || ''
+      };
+
+      // Hacemos el POST limpio, enviando el objeto plano sin corchetes ni anidaciones
+      await axios.post(`http://localhost:8080/api/favoritos`, payload);
+      
+      isFavorito.value = true;
+      idFavoritoActual.value = payload.idContenido;
+      console.log("Agregado a favoritos con éxito");
+      
+      // Sincronizamos el estado de la vista llamando al GET
+      await verificarSiEsFavorito();
+    }
+  } catch (error) {
+    console.error("Error al procesar el cambio en favoritos:", error);
+    alert("Hubo un problema al guardar. Revisa que el ID del perfil exista en la base de datos.");
+  }
+};
 </script>
 
 <template>
