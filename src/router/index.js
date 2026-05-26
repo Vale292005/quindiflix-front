@@ -47,6 +47,12 @@ const router = createRouter({
       name: 'panel-empleado',
       component: PanelEmpleadoView,
       meta: { requiresAuth: true, requiresRole: 'empleado' }
+    },
+    {
+      path: '/contenido-empleado/:id',
+      name: 'contenido-empleado',
+      component: () => import('../views/ContenidoDetalleEpl.vue'),
+      meta: { requiresAuth: true, requiresRole: 'empleado' }
     }
   ]
 });

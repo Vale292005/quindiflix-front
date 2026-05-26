@@ -61,8 +61,8 @@ const cargarContenidos = async () => {
       const response = await api.get(`http://localhost:8080/api/favoritos/perfil/${idPerfilActual}`);
       favoritos.value = response.data || [];
     }
-    
-    const responseGeneros = await api.get('http://localhost:8080/api/generos'); 
+
+    const responseGeneros = await api.get('http://localhost:8080/api/generos');
     generos.value = responseGeneros.data || [];
 
   } catch (error) {
@@ -76,6 +76,12 @@ const cargarContenidos = async () => {
 // Navegación
 const irADetalle = (idContenido) => {
   router.push(`/contenido/${idContenido}`);
+};
+
+// FUNCIÓN CORREGIDA: Apunta al path estricto con el parámetro dinámico /:id
+const irADetalleEmpleado = () => {
+  const idCuenta = perfilActivo.value?.idCuenta || perfilActivo.value?.id_cuenta || 1;
+  router.push(`/contenido-empleado/${idCuenta}`);
 };
 
 const irPanelEmpleado = () => {
@@ -102,13 +108,20 @@ const contenidosPorGenero = (idGenero) => {
 
 onMounted(cargarContenidos);
 </script>
+
 <template>
   <div class="dashboard bg-dark min-vh-100 text-white pb-5">
 
     <header class="p-4 d-flex justify-content-between align-items-center">
-      <h1 class="text-danger fw-bold m-0" style="cursor: pointer;" @click="$router.push('/dashboard')">QUINDIFLIX</h1>
+      <h1 class="text-danger fw-bold m-0" style="cursor: pointer;" @click="router.push('/dashboard')">QUINDIFLIX</h1>
 
       <div class="d-flex align-items-center gap-3">
+        
+        <button v-if="esEmpleado" @click="irADetalleEmpleado"
+          class="btn btn-primary d-flex align-items-center gap-2 shadow-sm fw-bold">
+          📊 Consola BI Empleado
+        </button>
+
         <div class="dropdown">
           <button class="btn btn-outline-light dropdown-toggle d-flex align-items-center gap-2" type="button"
             id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
@@ -149,18 +162,14 @@ onMounted(cargarContenidos);
       <section class="mt-4" v-if="favoritos && favoritos.length">
         <h3 class="mb-3 fs-4 text-warning"><i class="bi bi-star-fill me-2"></i>Mi Lista Favorita</h3>
         <div class="row-scroll">
-
           <div v-for="item in favoritos" :key="item.idContenido || item.id_contenido" class="content-card"
             @click="irADetalle(item.idContenido || item.id_contenido)" style="cursor: pointer;">
-
             <div class="card-image rounded"
               :style="{ backgroundImage: `url(${item.urlImagen || item.url_imagen || 'https://via.placeholder.com/220x125'})` }">
               <span class="original-tag" v-if="item.esOriginal || item.es_original">Original</span>
               <p class="title-overlay">{{ item.titulo }}</p>
             </div>
-
           </div>
-
         </div>
       </section>
 
@@ -172,16 +181,13 @@ onMounted(cargarContenidos);
             <div
               class="card-image rounded position-relative overflow-hidden bg-dark d-flex align-items-center justify-content-center"
               style="height: 125px; width: 220px;">
-
               <img v-if="item?.urlImagen" :src="item.urlImagen" referrerpolicy="no-referrer"
                 class="w-100 h-100 object-fit-cover position-absolute top-0 start-0"
                 @error="(e) => e.target.style.display = 'none'" />
-
               <div v-else class="text-center text-muted small position-absolute">
                 <i class="bi bi-play-circle fs-3 d-block mb-1"></i>
                 <span>{{ item?.titulo }}</span>
               </div>
-
               <span class="original-tag" v-if="item?.esOriginal" style="z-index: 2;">Original</span>
               <p class="title-overlay" style="z-index: 2;">{{ item?.titulo }}</p>
             </div>
@@ -218,52 +224,34 @@ onMounted(cargarContenidos);
 
       <section class="mt-5" v-if="generos && generos.length">
         <h3 class="mb-3 fs-4 text-white">Explorar por Géneros</h3>
-        
         <div class="accordion accordion-dark" id="accordionGeneros">
-          <div class="accordion-item bg-dark text-white border-secondary" 
-               v-for="(genero, index) in generos" :key="genero.idGenero">
-            
+          <div class="accordion-item bg-dark text-white border-secondary" v-for="(genero, index) in generos"
+            :key="genero.idGenero">
             <h2 class="accordion-header" :id="'heading-' + genero.idGenero">
-              <button class="accordion-button collapsed bg-dark text-white fw-bold" 
-                      type="button" 
-                      data-bs-toggle="collapse" 
-                      :data-bs-target="'#collapse-' + genero.idGenero" 
-                      aria-expanded="false" 
-                      :aria-controls="'collapse-' + genero.idGenero">
+              <button class="accordion-button collapsed bg-dark text-white fw-bold" type="button"
+                data-bs-toggle="collapse" :data-bs-target="'#collapse-' + genero.idGenero" aria-expanded="false"
+                :aria-controls="'collapse-' + genero.idGenero">
                 {{ genero.nombre }}
               </button>
             </h2>
-            
-            <div :id="'collapse-' + genero.idGenero" 
-                 class="accordion-collapse collapse" 
-                 :aria-labelledby="'heading-' + genero.idGenero" 
-                 data-bs-parent="#accordionGeneros">
-              
+            <div :id="'collapse-' + genero.idGenero" class="accordion-collapse collapse"
+              :aria-labelledby="'heading-' + genero.idGenero" data-bs-parent="#accordionGeneros">
               <div class="accordion-body bg-dark px-2">
-                
                 <div v-if="contenidosPorGenero(genero.idGenero).length" class="row-scroll">
-                  <div v-for="item in contenidosPorGenero(genero.idGenero)" 
-                       :key="item.idContenido" 
-                       class="content-card"
-                       @click="irADetalle(item.idContenido)" 
-                       style="cursor: pointer;">
-                    
+                  <div v-for="item in contenidosPorGenero(genero.idGenero)" :key="item.idContenido" class="content-card"
+                    @click="irADetalle(item.idContenido)" style="cursor: pointer;">
                     <div class="card-image rounded"
                       :style="{ backgroundImage: `url(${item.urlImagen || 'https://via.placeholder.com/220x125'})` }">
                       <span class="original-tag" v-if="item.esOriginal">Original</span>
                       <p class="title-overlay">{{ item.titulo }}</p>
                     </div>
-                    
                   </div>
                 </div>
-                
                 <div v-else class="text-muted small py-2 ps-3">
                   <i class="bi bi-info-circle me-2"></i>No hay contenidos disponibles en este género.
                 </div>
-
               </div>
             </div>
-
           </div>
         </div>
       </section>
