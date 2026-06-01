@@ -53,6 +53,18 @@ const router = createRouter({
       name: 'contenido-empleado',
       component: () => import('../views/ContenidoDetalleEpl.vue'),
       meta: { requiresAuth: true, requiresRole: 'empleado' }
+    },
+    {
+      path: '/gestion-contenido',
+      name: 'gestion-contenido',
+      component: () => import('../views/GestionCatalogoView.vue'),
+      meta: { requiresAuth: true, requiresRole: 'empleado' }
+    },
+    {
+      path: '/metricas',
+      name: 'metricas',
+      component: () => import('../views/MetricasView.vue'),
+      meta: { requiresAuth: false, requiresRole: 'empleado' }
     }
   ]
 });

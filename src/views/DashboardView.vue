@@ -3,12 +3,12 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useContentStore } from '../stores/content';
 import api from '../api/axios'
+import { useAuthStore } from '../stores/auth';
 
 const router = useRouter();
 const contentStore = useContentStore();
+const authStore = useAuthStore();
 const generos = ref([]);
-
-// Variables de estado
 const contenidos = ref([]);
 const favoritos = ref([]);
 const loading = ref(true);
@@ -78,10 +78,17 @@ const irADetalle = (idContenido) => {
   router.push(`/contenido/${idContenido}`);
 };
 
-// FUNCIÓN CORREGIDA: Apunta al path estricto con el parámetro dinámico /:id
 const irADetalleEmpleado = () => {
   const idCuenta = perfilActivo.value?.idCuenta || perfilActivo.value?.id_cuenta || 1;
   router.push(`/contenido-empleado/${idCuenta}`);
+};
+
+const irGestionContenido = () => {
+  router.push(`/gestion-contenido`);
+};
+
+const irMetricas = () => {
+  router.push(`/metricas`);
 };
 
 const irPanelEmpleado = () => {
@@ -116,10 +123,20 @@ onMounted(cargarContenidos);
       <h1 class="text-danger fw-bold m-0" style="cursor: pointer;" @click="router.push('/dashboard')">QUINDIFLIX</h1>
 
       <div class="d-flex align-items-center gap-3">
-        
+
         <button v-if="esEmpleado" @click="irADetalleEmpleado"
           class="btn btn-primary d-flex align-items-center gap-2 shadow-sm fw-bold">
           📊 Consola BI Empleado
+        </button>
+
+        <button v-if="esEmpleado && authStore.usuario?.idDepartamento === 2" @click="irGestionContenido"
+          class="btn btn-primary d-flex align-items-center gap-2 shadow-sm fw-bold">
+          📊 Gestion de Contenido
+        </button>
+
+        <button v-if="esEmpleado && authStore.usuario?.idDepartamento === 2" @click="irMetricas"
+          class="btn btn-primary d-flex align-items-center gap-2 shadow-sm fw-bold">
+          📊 Métricas de Contenido
         </button>
 
         <div class="dropdown">

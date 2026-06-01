@@ -30,49 +30,55 @@ export const useAuthStore = defineStore('auth', () => {
 
     async function iniciarSesionEmpleado(email, password) {
         try {
-            // 1. Limpieza preventiva total de cualquier sesión previa
             localStorage.clear();
             usuario.value = null;
             perfiles.value = [];
 
-            const payload = {
-                correo: email,
-                password: password
-            };
-
-            console.log("🚀 Enviando payload de Empleado (JWT Mode)...", payload);
-
-            // Apuntamos al endpoint aislado de Spring Boot
+            const payload = { correo: email, password: password };
             const respuesta = await axios.post('http://localhost:8080/api/auth/login-empleado', payload);
             const empleado = respuesta.data;
 
-            console.log("👋 Empleado autenticado con éxito:", empleado.nombre);
-
-            // ==========================================================
-            // 🔥 EL CAMBIO CRÍTICO: CAPTURAR E INYECTAR EL TOKEN JWT 🔥
-            // Revisa si tu backend lo devuelve como empleado.token o respuesta.data.token
             const token = empleado.token || respuesta.data.token;
+            let deptoId = null;
 
             if (token) {
                 localStorage.setItem('token', token);
-                // Inyectamos el Bearer Token inmediatamente en Axios para las siguientes peticiones
                 axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-                console.log("🔑 Token JWT corporativo inyectado con éxito.");
-            } else {
-                console.error("❌ ERROR: El backend autenticó pero no devolvió un campo 'token'.");
-            }
-            // ==========================================================
+                console.log("🔑 Token JWT corporativo obtenido.");
 
-            // 2. Creamos el perfil virtual/ficticio para saltar la selección de perfiles en el front
+                // 🔥 LA MAGIA: Desencriptar la parte central (Payload) del JWT en JavaScript puro
+                try {
+                    const base64Url = token.split('.')[1]; // Agarramos los Claims del token
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join(''));
+
+                    const tokenData = JSON.parse(jsonPayload);
+                    console.log("🎯 Datos dentro del JWT descifrado:", tokenData);
+
+                    // Sacamos el idDepartamento que metiste en el Claims del backend
+                    deptoId = tokenData.idDepartamento || tokenData.id_departamento;
+                } catch (e) {
+                    console.error("❌ Error leyendo los claims del JWT:", e);
+                }
+            }
+
+            // Si logramos sacar el ID del token lo usamos; si falló por completo, dejamos un fallback defensivo
+            const deptoFinal = deptoId !== null && deptoId !== undefined ? Number(deptoId) : 1;
+            console.log("🏢 Departamento detectado final:", deptoFinal);
+
+            // 2. Creamos el perfil incluyendo el ID real obtenido del JWT
             const perfilEmpleado = {
                 nombre: empleado.nombre || empleado.nombreCompleto || 'Admin',
                 tipoPerfil: 'Empleado',
-                avatar: 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png'
+                avatar: 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png',
+                idDepartamento: deptoFinal
             };
 
             localStorage.setItem('perfil_activo', JSON.stringify(perfilEmpleado));
 
-            // 3. Guardamos los datos en el estado reactivo global
+            empleado.idDepartamento = deptoFinal;
             guardarSesion(empleado);
 
             return empleado;
